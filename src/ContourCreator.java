@@ -42,8 +42,8 @@ public class ContourCreator extends JPanel {
 	}
 
 	public ContourCreator(String file) throws IOException {
-		int maxHeight = 9;
-		double stepSize = .25;
+		double maxHeight = 1.5;
+		double stepSize = .05;
 
 		contours = new ArrayList<Shape>();
 
@@ -75,10 +75,20 @@ public class ContourCreator extends JPanel {
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		Graphics2D g2 = (Graphics2D) g;
-		g2.setColor(Color.RED);
 		
+		boolean col = true;
 		for (Shape co : contours) {
+			g2.setColor(toggle(col));
+			col = ! col;
 			g2.draw(drag.createTransformedShape(zoom.createTransformedShape(co)));
+		}
+	}
+	
+	private Color toggle(boolean tog) {
+		if (tog) {
+			return Color.RED;
+		}else {
+			return Color.BLACK;
 		}
 	}
 
@@ -166,7 +176,7 @@ public class ContourCreator extends JPanel {
 			// positive values if the mouse wheel was rotated down/ towards the user
 			int rot = arg0.getWheelRotation();
 			double scale = Math.pow(1.1, rot);
-			System.out.println(rot + " " + scale);
+			//System.out.println(rot + " " + scale);
 			zoom.scale(scale, scale);
 			repaint();
 		}
