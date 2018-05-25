@@ -1,3 +1,4 @@
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -22,14 +23,20 @@ import javax.swing.JPanel;
 public class ContourCreator extends JPanel {
 
 	private List<Shape> contours;
+	private List<Shape> transformedContours;
+	private List<Shape> majorContours;
+	private List<Shape> transformedMajorContours;
 	private Path2D.Double contour;
 	private List<Triangle> mesh;
 	private AffineTransform zoom = new AffineTransform();
 	private AffineTransform drag = new AffineTransform();
 
+	private double lakeWashThresh = 4.06;
+	private double[] seattleMajorVals = { 3, lakeWashThresh, 4.5395, 5.01, 5.45};
+
 	public static void main(String[] args) throws IOException {
 
-		ContourCreator cc = new ContourCreator("rawmodel-5627.stl");
+		ContourCreator cc = new ContourCreator("seattle-good.stl");
 
 		JFrame f = new JFrame("Line");
 		f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -42,10 +49,14 @@ public class ContourCreator extends JPanel {
 	}
 
 	public ContourCreator(String file) throws IOException {
-		double maxHeight = 1.5;
-		double stepSize = .05;
+		double maxHeight = 6;// 1.5;
+		double stepSize = .1;
+		double[] majorVals = seattleMajorVals;
 
 		contours = new ArrayList<Shape>();
+		transformedContours = new ArrayList<Shape>();
+		majorContours = new ArrayList<Shape>();
+		transformedMajorContours = new ArrayList<Shape>();
 
 		Path stlPath = Paths.get(file);
 
@@ -62,9 +73,19 @@ public class ContourCreator extends JPanel {
 
 		affine.scale(1, -1);
 
-		for (double thresh = 0;/*0.0000000000001; */thresh < maxHeight; thresh += stepSize) {
-			contours.add(affine.createTransformedShape(process(thresh)));
+		for (double thresh = 4; /* 0.0000000000001; */thresh < maxHeight; thresh += stepSize) {
+			Path2D.Double path = process(thresh);
+			// System.out.println();
+			contours.add(affine.createTransformedShape(path));
+			transformedContours.add(affine.createTransformedShape(path));
 			// contours[i
+		}
+
+		for (double thresh : majorVals) {
+			Path2D.Double path = process(thresh);
+			// System.out.println();
+			majorContours.add(affine.createTransformedShape(path));
+			transformedMajorContours.add(affine.createTransformedShape(path));
 		}
 
 		addMouseWheelListener(new ZoomListener());
@@ -75,19 +96,23 @@ public class ContourCreator extends JPanel {
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		Graphics2D g2 = (Graphics2D) g;
-		
+
 		boolean col = true;
-		for (Shape co : contours) {
-			g2.setColor(toggle(col));
-			col = ! col;
-			g2.draw(drag.createTransformedShape(zoom.createTransformedShape(co)));
+		g2.setColor(Color.RED);
+		for (Shape co : transformedContours) {
+			g2.draw(co);// zoom.createTransformedShape(drag.createTransformedShape(co)));
+		}
+		g2.setColor(Color.BLACK);
+		g2.setStroke(new BasicStroke(2));
+		for (Shape co : transformedMajorContours) {
+			g2.draw(co);// zoom.createTransformedShape(drag.createTransformedShape(co)));
 		}
 	}
-	
+
 	private Color toggle(boolean tog) {
 		if (tog) {
 			return Color.RED;
-		}else {
+		} else {
 			return Color.BLACK;
 		}
 	}
@@ -117,22 +142,43 @@ public class ContourCreator extends JPanel {
 
 	private Path2D.Double process(double zThresh) throws IOException {
 		contour = new Path2D.Double();
+		double almostZero = 0.0000;
 
 		for (Triangle t : mesh) {
-			int countBelow = 0;
+			int countBelow = 0, countAbove = 0, countAt = 0;
 			Vec3d prev = null;
+
+			// special lake washington filter
+			if (zThresh == lakeWashThresh) {
+				if (t.getVertices()[0].x < 110) {
+					continue;
+				}
+			}
+
 			for (Vec3d vertex : t.getVertices()) {
-				if (vertex.z <= zThresh) {
+
+				if ((vertex.z - zThresh) * (vertex.z - zThresh) <= almostZero) {
+					// not sure this is the right thing to do for the "equals" case
+					countAt++;
+				} else if (vertex.z < zThresh) {
 					countBelow++;
+				} else {
+					countAbove++;
 				}
 				prev = vertex;
 			}
-			if (countBelow % 3 != 0) {
-				List<Vec3d> list = new ArrayList<Vec3d>();
+
+			List<Vec3d> list = new ArrayList<Vec3d>();
+			if (countBelow != 3 && countAbove != 3) {
+
 				for (Vec3d vertex : t.getVertices()) {
 					// if they're on opposite sides
 					if ((zThresh - vertex.z) * (zThresh - prev.z) <= 0) {
 						list.add(getIntersect(vertex, prev, zThresh));
+					}
+					if ((vertex.z - zThresh) * (vertex.z - zThresh) <= almostZero) {
+						// not sure this is the right thing to do for the "equals" case
+						list.add(vertex);
 					}
 					prev = vertex;
 				}
@@ -140,13 +186,16 @@ public class ContourCreator extends JPanel {
 					System.out.println(countBelow + " " + zThresh);
 					System.out.println(t);
 				}
-				addToContour(list);
 			}
+			addToContour(list);
 		}
 		return contour;
 	}
 
 	private void addToContour(List<Vec3d> list) {
+		if (list.isEmpty()) {
+			return;
+		}
 		contour.moveTo(list.get(0).x, list.get(0).y);
 		for (Vec3d pt : list) {
 			if (!pt.equals(list.get(0))) {
@@ -176,20 +225,47 @@ public class ContourCreator extends JPanel {
 			// positive values if the mouse wheel was rotated down/ towards the user
 			int rot = arg0.getWheelRotation();
 			double scale = Math.pow(1.1, rot);
-			//System.out.println(rot + " " + scale);
-			zoom.scale(scale, scale);
+			// System.out.println(rot + " " + scale);
+
+			// does the order have to be reversed here?
+			zoom.setToScale(scale, scale);
+			zoom.translate(arg0.getX() - scale * arg0.getX(), arg0.getY() - scale * arg0.getY());
+
+			List<Shape> newShapes = new ArrayList<Shape>();
+			for (Shape co : transformedContours) {
+				newShapes.add(zoom.createTransformedShape(co));
+			}
+			transformedContours = newShapes;
+			newShapes = new ArrayList<Shape>();
+			for (Shape co : transformedMajorContours) {
+				newShapes.add(zoom.createTransformedShape(co));
+			}
+			transformedMajorContours = newShapes;
 			repaint();
 		}
 
 	}
-	
+
 	private class DragListener implements MouseMotionListener {
-		
+
 		Point2D.Double pt = new Point2D.Double(0, 0);
 
 		@Override
 		public void mouseDragged(MouseEvent arg0) {
-			drag.translate(arg0.getX()-pt.x, arg0.getY() - pt.y);
+			// drag.translate(arg0.getX() - pt.x, arg0.getY() - pt.y);
+			drag.setToTranslation(arg0.getX() - pt.x, arg0.getY() - pt.y);
+
+			List<Shape> newShapes = new ArrayList<Shape>();
+			for (Shape co : transformedContours) {
+				newShapes.add(drag.createTransformedShape(co));
+			}
+			transformedContours = newShapes;
+			newShapes = new ArrayList<Shape>();
+			for (Shape co : transformedMajorContours) {
+				newShapes.add(drag.createTransformedShape(co));
+			}
+			transformedMajorContours = newShapes;
+
 			pt.setLocation(arg0.getX(), arg0.getY());
 			repaint();
 		}
@@ -199,7 +275,7 @@ public class ContourCreator extends JPanel {
 			// TODO Auto-generated method stub
 			pt.setLocation(arg0.getX(), arg0.getY());
 		}
-		
+
 	}
 
 }

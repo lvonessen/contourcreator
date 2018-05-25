@@ -1,3 +1,4 @@
+
 /*
 The MIT License (MIT)
 
@@ -32,111 +33,120 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * This class is a parser for STL files. Currently, normals specified in the 
- * file are ignored and recalculated under the assumption that the coordinates 
+ * This class is a parser for STL files. Currently, normals specified in the
+ * file are ignored and recalculated under the assumption that the coordinates
  * are provided in right-handed coordinate space (counter-clockwise).
+ * 
  * @author CCHall
  * @author Andrew Goh
  * 
- *  * -reversion: mar 2017 Andrew
- * updated logic to handle binary STL files with "solid" in the header 
+ *         * -reversion: mar 2017 Andrew updated logic to handle binary STL
+ *         files with "solid" in the header
  */
 public class STLParser {
 	/**
-	 * Parses an STL file, attempting to automatically detect whether the file 
-	 * is an ASCII or binary STL file
-	 * @param filepath The file to parse
-	 * @return A list of triangles representing all of the triangles in the STL 
-	 * file.
-	 * @throws IOException Thrown if there was a problem reading the file 
-	 * (typically means the file does not exist or is not a file).
-	 * @throws IllegalArgumentException Thrown if the STL is not properly 
-	 * formatted
+	 * Parses an STL file, attempting to automatically detect whether the file is an
+	 * ASCII or binary STL file
+	 * 
+	 * @param filepath
+	 *            The file to parse
+	 * @return A list of triangles representing all of the triangles in the STL
+	 *         file.
+	 * @throws IOException
+	 *             Thrown if there was a problem reading the file (typically means
+	 *             the file does not exist or is not a file).
+	 * @throws IllegalArgumentException
+	 *             Thrown if the STL is not properly formatted
 	 */
-	public static List<Triangle> parseSTLFile(Path filepath) throws IOException{
+	public static List<Triangle> parseSTLFile(Path filepath) throws IOException {
 		byte[] allBytes = Files.readAllBytes(filepath);
 		// determine if it is ASCII or binary STL
 
-		//some binary STL files has "solid" in the first 80 chars
-		//this breaks logic that determines if a file is ascii based on it
-		//simply beginning with "solid"
+		// some binary STL files has "solid" in the first 80 chars
+		// this breaks logic that determines if a file is ascii based on it
+		// simply beginning with "solid"
 		boolean isASCIISTL = false;
-		
-		//read the first 512 chars or less
+
+		// read the first 512 chars or less
 		String buf = readblock(allBytes, 0, 512);
 		StringBuffer sb = new StringBuffer();
 		int inl = readline(buf, sb, 0);
 		String line = sb.toString();
 		StringTokenizer st = new StringTokenizer(line);
 		String token = st.nextToken();
-		if(token.equals("solid")) { //start with "solid"
-			if(inl>-1) { //found new line for next line			
+		if (token.equals("solid")) { // start with "solid"
+			if (inl > -1) { // found new line for next line
 				sb = new StringBuffer();
-				inl = readline(buf, sb, inl+1); //read next line
+				inl = readline(buf, sb, inl + 1); // read next line
 				line = sb.toString();
 				st = new StringTokenizer(line);
 				token = st.nextToken();
-				if(token.equals("endsolid"))
-					isASCIISTL = true; //empty ascii file
-				else if(token.equals("facet")) {
-					isASCIISTL = true; //ascii file
+				if (token.equals("endsolid"))
+					isASCIISTL = true; // empty ascii file
+				else if (token.equals("facet")) {
+					isASCIISTL = true; // ascii file
 				} else if (isbinaryfile(allBytes))
-					isASCIISTL = false; //binary file					
-			} else { //no linefeed
+					isASCIISTL = false; // binary file
+			} else { // no linefeed
 				if (isbinaryfile(allBytes))
-					isASCIISTL = false; //binary file
-			}				
-		} else {//does not starts with "solid" 
-			if (isbinaryfile(allBytes)) 
-				isASCIISTL = false; //binary file
+					isASCIISTL = false; // binary file
+			}
+		} else {// does not starts with "solid"
+			if (isbinaryfile(allBytes))
+				isASCIISTL = false; // binary file
 		}
-		
+
 		// read file to array of triangles
 		List<Triangle> mesh;
-		if(isASCIISTL){
+		if (isASCIISTL) {
 			Charset charset = Charset.forName("UTF-8");
 			mesh = readASCII(charset.decode(ByteBuffer.wrap(allBytes)).toString().toLowerCase());
+			System.out.println("Read in ASCII file");
 		} else {
 			mesh = readBinary(allBytes);
+			System.out.println("Read in binary file");
 		}
 		return mesh;
 	}
-	
-	
+
 	public static String readblock(byte[] allBytes, int offset, int length) {
-		if(allBytes.length-offset<length) length = allBytes.length-offset;
+		if (allBytes.length - offset < length)
+			length = allBytes.length - offset;
 		Charset charset = Charset.forName("UTF-8");
 		CharBuffer decode = charset.decode(ByteBuffer.wrap(allBytes, offset, length));
 		return decode.toString().toLowerCase();
 	}
-	
+
 	public static int readline(String buf, StringBuffer sb, int offset) {
 		int il = buf.indexOf('\n', offset);
-		if(il>-1)
-			sb.append(buf.substring(offset, il-1));
+		if (il > -1)
+			sb.append(buf.substring(offset, il - 1));
 		else
 			sb.append(buf.substring(offset));
 		return il;
 	}
-	
+
 	public static boolean isbinaryfile(byte[] allBytes) throws IllegalArgumentException {
-		if (allBytes.length<84)
-			throw new IllegalArgumentException("invalid binary file, length<84");			
+		if (allBytes.length < 84)
+			throw new IllegalArgumentException("invalid binary file, length<84");
 		int numtriangles = byteatoint(Arrays.copyOfRange(allBytes, 80, 84));
 		if (allBytes.length >= 84 + numtriangles * 50)
-			return true; //is binary file
+			return true; // is binary file
 		else {
 			String msg = "invalid binary file, num triangles does not match length specs";
 			throw new IllegalArgumentException(msg);
 		}
 	}
-	
+
 	// little endian
 	public static int byteatoint(byte[] bytes) {
 		assert (bytes.length == 4);
@@ -144,30 +154,66 @@ public class STLParser {
 		r = bytes[0] & 0xff;
 		r |= (bytes[1] & 0xff) << 8;
 		r |= (bytes[2] & 0xff) << 16;
-		r |= (bytes[3] & 0xff) << 24 ;		
+		r |= (bytes[3] & 0xff) << 24;
 		return r;
 	}
 
+	private static Map<Double, Integer> nMap = new HashMap<Double, Integer>();
+	private static Map<Double, Integer> zMap = new TreeMap<Double, Integer>();
 
-	
 	/**
 	 * Reads an STL ASCII file content provided as a String
-	 * @param content ASCII STL
-	 * @return A list of triangles representing all of the triangles in the STL 
-	 * file.
-	 * @throws IllegalArgumentException Thrown if the STL is not properly 
-	 * formatted
+	 * 
+	 * @param content
+	 *            ASCII STL
+	 * @return A list of triangles representing all of the triangles in the STL
+	 *         file.
+	 * @throws IllegalArgumentException
+	 *             Thrown if the STL is not properly formatted
 	 */
 	public static List<Triangle> readASCII(String content) {
-		Logger.getLogger(STLParser.class.getName()).log(Level.FINEST,"Parsing ASCII STL format");
+		Logger.getLogger(STLParser.class.getName()).log(Level.FINEST, "Parsing ASCII STL format");
 		// string is lowercase
 		ArrayList<Triangle> triangles = new ArrayList<>();
-		
+
 		int position = 0;
-		scan:
-		{
+		scan: {
 			while (position < content.length() & position >= 0) {
 				position = content.indexOf("facet", position);
+
+				// this block is code I added to analyze the normals because I'm so confused
+				// about this file right now
+				int oldPosition = position;
+				{
+					position = content.indexOf("normal", position) + "normal".length();
+					while (Character.isWhitespace(content.charAt(position))) {
+						position++;
+					}
+					int nextSpace;
+					double[] vals = new double[3];
+					for (int d = 0; d < vals.length; d++) {
+						nextSpace = position + 1;
+						while (!Character.isWhitespace(content.charAt(nextSpace))) {
+							nextSpace++;
+						}
+						String value = content.substring(position, nextSpace);
+						vals[d] = Double.parseDouble(value);
+						position = nextSpace;
+						while (Character.isWhitespace(content.charAt(position))) {
+							position++;
+						}
+					}
+					// tada the z value of the normal is in vals[2]
+					double bucketSize = 20;
+					double bucket = ((int) (vals[2] * bucketSize)) / bucketSize;
+					if (nMap.get(bucket) == null) {
+						nMap.put(bucket, 1);
+					} else {
+						nMap.put(bucket, nMap.get(bucket) + 1);
+					}
+				}
+				position = oldPosition;
+
 				if (position < 0) {
 					break scan;
 				}
@@ -193,8 +239,20 @@ public class STLParser {
 							}
 						}
 						vertices[v] = new Vec3d(vals[0], vals[1], vals[2]);
+						
+						// more extra stuffs
+						{
+							// tada the z value of the point is in vals[2]
+							double bucketSize = 20;
+							double bucket = ((int) (vals[2] * bucketSize)) / bucketSize;
+							if (zMap.get(bucket) == null) {
+								zMap.put(bucket, 1);
+							} else {
+								zMap.put(bucket, zMap.get(bucket) + 1);
+							}
+						}
 					}
-					position = content.indexOf("endfacet", position)+"endfacet".length();
+					position = content.indexOf("endfacet", position) + "endfacet".length();
 					triangles.add(new Triangle(vertices[0], vertices[1], vertices[2]));
 				} catch (Exception ex) {
 					int back = position - 128;
@@ -205,28 +263,33 @@ public class STLParser {
 					if (position > content.length()) {
 						forward = content.length();
 					}
-					throw new IllegalArgumentException("Malformed STL syntax near \"" + content.substring(back, forward) + "\"", ex);
+					throw new IllegalArgumentException(
+							"Malformed STL syntax near \"" + content.substring(back, forward) + "\"", ex);
 				}
 			}
 		}
 		
+		System.out.println(nMap);
+		System.out.println(zMap);
+
 		return triangles;
 	}
-	
-	
+
 	/**
 	 * Parses binary STL file content provided as a byte array
-	 * @param allBytes binary STL
-	 * @return A list of triangles representing all of the triangles in the STL 
-	 * file.
-	 * @throws IllegalArgumentException Thrown if the STL is not properly 
-	 * formatted
+	 * 
+	 * @param allBytes
+	 *            binary STL
+	 * @return A list of triangles representing all of the triangles in the STL
+	 *         file.
+	 * @throws IllegalArgumentException
+	 *             Thrown if the STL is not properly formatted
 	 */
 	public static List<Triangle> readBinary(byte[] allBytes) {
-		Logger.getLogger(STLParser.class.getName()).log(Level.FINEST,"Parsing binary STL format");
+		Logger.getLogger(STLParser.class.getName()).log(Level.FINEST, "Parsing binary STL format");
 		DataInputStream in = new DataInputStream(new ByteArrayInputStream(allBytes));
 		ArrayList<Triangle> triangles = new ArrayList<>();
-		try{
+		try {
 			// skip the header
 			byte[] header = new byte[80];
 			in.read(header);
@@ -235,19 +298,19 @@ public class STLParser {
 			int numberTriangles = Integer.reverseBytes(in.readInt());
 			triangles.ensureCapacity(numberTriangles);
 			// read triangles
-			try{
-				while(in.available() > 0 ){
+			try {
+				while (in.available() > 0) {
 					float[] nvec = new float[3];
-					for(int i = 0; i < nvec.length; i++){
+					for (int i = 0; i < nvec.length; i++) {
 						nvec[i] = Float.intBitsToFloat(Integer.reverseBytes(in.readInt()));
 					}
-					Vec3d normal = new Vec3d(nvec[0],nvec[1],nvec[2]); // not used (yet)
+					Vec3d normal = new Vec3d(nvec[0], nvec[1], nvec[2]); // not used (yet)
 					Vec3d[] vertices = new Vec3d[3];
 					for (int v = 0; v < vertices.length; v++) {
 						float[] vals = new float[3];
 						for (int d = 0; d < vals.length; d++) {
 							// http://fightpc.blogspot.com/2014/08/reading-binary-stl-files-in-java.html
-							// (b[3]<<24)&0xff000000 | (b[2]<<16)&0xff0000 | (b[1]<<8)&0xff00 | b[0]&0xff  
+							// (b[3]<<24)&0xff000000 | (b[2]<<16)&0xff0000 | (b[1]<<8)&0xff00 | b[0]&0xff
 							vals[d] = Float.intBitsToFloat(Integer.reverseBytes(in.readInt()));
 						}
 						vertices[v] = new Vec3d(vals[0], vals[1], vals[2]);
@@ -255,23 +318,26 @@ public class STLParser {
 					short attribute = Short.reverseBytes(in.readShort()); // not used (yet)
 					triangles.add(new Triangle(vertices[0], vertices[1], vertices[2]));
 				}
-			}catch(Exception ex){
-				throw new IllegalArgumentException("Malformed STL binary at triangle number " + (triangles.size()+1), ex);
+			} catch (Exception ex) {
+				throw new IllegalArgumentException("Malformed STL binary at triangle number " + (triangles.size() + 1),
+						ex);
 			}
-		}catch(IOException ex){
-			// IO exceptions are impossible with byte array input streams, 
+		} catch (IOException ex) {
+			// IO exceptions are impossible with byte array input streams,
 			// but still need to be caught
-			Logger.getLogger(STLParser.class.getName()).log(Level.SEVERE, "HOLY SHIT! A ByteArrayInputStream threw an exception!", ex);
+			Logger.getLogger(STLParser.class.getName()).log(Level.SEVERE,
+					"HOLY SHIT! A ByteArrayInputStream threw an exception!", ex);
 		}
 		return triangles;
 	}
-	
+
 	private float intToFloat(int in) {
 		// This code:
-		//return Float.intBitsToFloat(Integer.reverseBytes(in));
+		// return Float.intBitsToFloat(Integer.reverseBytes(in));
 		// Seems identical to this code:
 		byte[] b = ByteBuffer.allocate(4).putInt(Integer.reverseBytes(in)).array();
-		return Float.intBitsToFloat( (b[3]<<24)&0xff000000 | (b[2]<<16)&0xff0000 | (b[1]<<8)&0xff00 | b[0]&0xff ) ;
+		return Float.intBitsToFloat(
+				(b[3] << 24) & 0xff000000 | (b[2] << 16) & 0xff0000 | (b[1] << 8) & 0xff00 | b[0] & 0xff);
 	}
-	
+
 }
