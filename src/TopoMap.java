@@ -1,6 +1,8 @@
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Path;
@@ -20,8 +22,6 @@ public class TopoMap {
 	private Map<Double, Set<List<Point2D.Double>>> contours = new TreeMap<Double, Set<List<Point2D.Double>>>();
 	private double lakeWashThresh = 4.06;
 
-	private static int foundMatch = 0;
-
 	public TopoMap(String file) throws IOException {
 
 		Path stlPath = Paths.get(file);
@@ -34,7 +34,7 @@ public class TopoMap {
 		double[] max = { Double.MIN_VALUE, Double.MIN_VALUE, Double.MIN_VALUE };
 		for (Triangle t : mesh) {
 			for (Vec3d vertex : t.getVertices()) {
-				double[] array = getArray(vertex);
+				double[] array = { vertex.x, vertex.y, vertex.z };
 				for (int i = 0; i < 3; i++) {
 					if (array[i] < min[i]) {
 						min[i] = array[i];
@@ -46,10 +46,6 @@ public class TopoMap {
 			}
 		}
 		return new double[][] { min, max };
-	}
-
-	private double[] getArray(Vec3d pt) {
-		return new double[] { pt.x, pt.y, pt.z };
 	}
 
 	public void initialize(double[] thresholds) {
@@ -142,8 +138,51 @@ public class TopoMap {
 		}
 		return paths;
 	}
+	
+	public void writePaths(String filename){
+		Set<List<Point2D.Double>> simplifiedContours = new HashSet<List<Point2D.Double>>();
+		for (Set<List<Point2D.Double>> set : contours.values()){
+			simplifiedContours.addAll(set);
+		}
+		writeObjectToFile(filename,simplifiedContours);
+	}
 
-	public static void addToContour(List<Point2D.Double> l0, Map<Point2D.Double, List<Point2D.Double>> consolidator) {
+
+	private void writeObjectToFile(String file, Object obj) {
+		try {
+			FileOutputStream fs = new FileOutputStream(file);
+			ObjectOutputStream oos = new ObjectOutputStream(fs);
+			oos.writeObject(obj);
+			oos.close();
+			fs.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * List of paths corresponding to threshold values
+	 * 
+	 * @return
+	 */
+	public List<Path2D.Double> asSimplePaths(int xOffset) {
+
+		List<Path2D.Double> paths = new ArrayList<Path2D.Double>();
+		for (double thresh : contours.keySet()) {
+			Set<List<Point2D.Double>> curContours = contours.get(thresh);
+			for (List<Point2D.Double> path : curContours) {
+				Path2D.Double path2d = new Path2D.Double();
+				path2d.moveTo(path.get(0).x + xOffset, path.get(0).y);
+				for (Point2D.Double pt : path) {
+					path2d.lineTo(pt.x + xOffset, pt.y);
+				}
+				paths.add(path2d);
+			}
+		}
+		return paths;
+	}
+
+	private void addToContour(List<Point2D.Double> l0, Map<Point2D.Double, List<Point2D.Double>> consolidator) {
 		if (l0.isEmpty()) {
 			return;
 		}
@@ -155,9 +194,6 @@ public class TopoMap {
 		for (int i = 0; i < 2; i++) {
 			Point2D.Double cur = l0.get(0);
 			List<Point2D.Double> l1 = consolidator.get(cur);
-			if (l1 != null) {
-				foundMatch++;
-			}
 			if (l0.equals(l1))
 				continue;
 			if (l1 != null) {

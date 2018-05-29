@@ -158,7 +158,7 @@ public class STLParser {
 		return r;
 	}
 
-	private static Map<Double, Integer> nMap = new HashMap<Double, Integer>();
+	private static Map<Double, Integer> nMap = new TreeMap<Double, Integer>();
 	private static Map<Double, Integer> zMap = new TreeMap<Double, Integer>();
 
 	/**
@@ -269,7 +269,9 @@ public class STLParser {
 			}
 		}
 		
+		System.out.println("Normals:");
 		System.out.println(nMap);
+		System.out.println("Z values");
 		System.out.println(zMap);
 
 		return triangles;

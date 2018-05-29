@@ -27,6 +27,7 @@ public class ContourCreator extends JPanel {
 
 	private List<Shape> contours;
 	private List<Shape> majorContours;
+	private List<Shape> selectionContours;
 	// private AffineTransform zoom = new AffineTransform();
 	// private AffineTransform drag = new AffineTransform();
 	private AffineTransform at = new AffineTransform();
@@ -36,7 +37,7 @@ public class ContourCreator extends JPanel {
 	private double lakeWashThresh = 4.06;
 	private double[] seattleMajorVals = { 3, //
 			lakeWashThresh, //
-			4.5395, 5.01, 5.35 }; // 5.45
+			4.5395, 4.967, 5.35 }; // 5.01, 5.45
 	private Color[] seattleColors = { Color.BLACK, //
 			Color.BLACK, //
 			Color.RED, Color.MAGENTA, Color.BLUE };
@@ -53,17 +54,6 @@ public class ContourCreator extends JPanel {
 		f.setSize(new Dimension(700, 900));
 		f.setVisible(true);
 
-		AffineTransform at = new AffineTransform();
-
-		at.scale(1, 2);
-		System.out.println(at);
-		at.translate(3, 4);
-		System.out.println(at);
-		at.scale(5, 6);
-		System.out.println(at);
-		at.translate(7, 8);
-		System.out.println(at);
-
 	}
 
 	public ContourCreator(String file) throws IOException {
@@ -75,33 +65,41 @@ public class ContourCreator extends JPanel {
 
 		contours = new ArrayList<Shape>();
 		majorContours = new ArrayList<Shape>();
+		selectionContours = new ArrayList<Shape>();
 
 		double[][] bounds = tm.getBounds();
 		System.out.println(Arrays.toString(bounds[0]));
 		System.out.println(Arrays.toString(bounds[1]));
 
-		AffineTransform affine = new AffineTransform();
+		at = new AffineTransform();
 
 		// this mirrors the map so it's right side up, etc
-		affine.scale(3, 3);
-		affine.translate(0, bounds[1][1]);
-		affine.scale(1, -1);
+		at.scale(3, 3);
+		at.translate(0, bounds[1][1]);
+		at.scale(1, -1);
 
 		tm.initialize(seattleMajorVals);
 		List<Path2D.Double> cts = tm.asPaths();
 		for (Path2D.Double ct : cts) {
-			majorContours.add(affine.createTransformedShape(ct));
+			majorContours.add(ct);//at.createTransformedShape(ct));
+		}
+		tm.writePaths("seattle-contours.obj");
+		
+		cts = tm.asSimplePaths(200);
+		for (Path2D.Double ct : cts) {
+			selectionContours.add(ct);//at.createTransformedShape(ct));
 		}
 
 		// get minor vals
 		tm.initialize(4, maxHeight, stepSize);
 		cts = tm.asPaths();
 		for (Path2D.Double ct : cts) {
-			contours.add(affine.createTransformedShape(ct));
+			contours.add(ct);//at.createTransformedShape(ct));
 		}
 
 		addMouseWheelListener(new ZoomListener());
 		addMouseMotionListener(new DragListener());
+		addMouseListener (new ClickListener());
 	}
 
 	@Override
@@ -122,6 +120,20 @@ public class ContourCreator extends JPanel {
 			Shape co = majorContours.get(i);
 			g2.setColor(seattleColors[i]);
 			g2.draw(at.createTransformedShape(co));
+		}
+		
+		int i=0;
+		for (Shape co : selectionContours) {
+
+			g2.setColor(Color.RED);
+			g2.draw(at.createTransformedShape(co));
+
+			g2.setColor(Color.BLACK);
+			double[] pts = new double[6];
+			co.getPathIterator(at).currentSegment(pts);
+			g2.drawString(""+co.hashCode(), (float) pts[0], (float) pts[1]);
+			
+			i++;
 		}
 
 		drawWithColor(g2, Color.BLACK, mouseLocation);
@@ -179,8 +191,14 @@ public class ContourCreator extends JPanel {
 
 		@Override
 		public void mouseClicked(MouseEvent arg0) {
-			// TODO Auto-generated method stub
-
+			Point2D.Double inv = null;
+			try {
+				inv = (Double) at.inverseTransform(mouseLocation, null);
+			} catch (NoninvertibleTransformException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			System.out.println(inv);
 		}
 
 		@Override
