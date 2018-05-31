@@ -54,16 +54,16 @@ import java.util.logging.Logger;
  */
 public class STLParser {
 	/**
-	 * Parses an STL file, attempting to automatically detect whether the file is an
-	 * ASCII or binary STL file
+	 * Parses an STL file, attempting to automatically detect whether the file
+	 * is an ASCII or binary STL file
 	 * 
 	 * @param filepath
 	 *            The file to parse
 	 * @return A list of triangles representing all of the triangles in the STL
 	 *         file.
 	 * @throws IOException
-	 *             Thrown if there was a problem reading the file (typically means
-	 *             the file does not exist or is not a file).
+	 *             Thrown if there was a problem reading the file (typically
+	 *             means the file does not exist or is not a file).
 	 * @throws IllegalArgumentException
 	 *             Thrown if the STL is not properly formatted
 	 */
@@ -109,8 +109,8 @@ public class STLParser {
 		List<Triangle> mesh;
 		if (isASCIISTL) {
 			Charset charset = Charset.forName("UTF-8");
+			System.out.println("Read in ASCII file:");
 			mesh = readASCII(charset.decode(ByteBuffer.wrap(allBytes)).toString().toLowerCase());
-			System.out.println("Read in ASCII file");
 		} else {
 			mesh = readBinary(allBytes);
 			System.out.println("Read in binary file");
@@ -149,7 +149,7 @@ public class STLParser {
 
 	// little endian
 	public static int byteatoint(byte[] bytes) {
-		assert (bytes.length == 4);
+		assert(bytes.length == 4);
 		int r = 0;
 		r = bytes[0] & 0xff;
 		r |= (bytes[1] & 0xff) << 8;
@@ -181,7 +181,8 @@ public class STLParser {
 			while (position < content.length() & position >= 0) {
 				position = content.indexOf("facet", position);
 
-				// this block is code I added to analyze the normals because I'm so confused
+				// this block is code I added to analyze the normals because I'm
+				// so confused
 				// about this file right now
 				int oldPosition = position;
 				{
@@ -198,6 +199,7 @@ public class STLParser {
 						}
 						String value = content.substring(position, nextSpace);
 						vals[d] = Double.parseDouble(value);
+
 						position = nextSpace;
 						while (Character.isWhitespace(content.charAt(position))) {
 							position++;
@@ -233,13 +235,21 @@ public class STLParser {
 							}
 							String value = content.substring(position, nextSpace);
 							vals[d] = Double.parseDouble(value);
+
+							// added to reverse y
+							{
+								if (d == 1) {
+									vals[d] = 279 - vals[d];
+								}
+							}
+
 							position = nextSpace;
 							while (Character.isWhitespace(content.charAt(position))) {
 								position++;
 							}
 						}
 						vertices[v] = new Vec3d(vals[0], vals[1], vals[2]);
-						
+
 						// more extra stuffs
 						{
 							// tada the z value of the point is in vals[2]
@@ -268,7 +278,7 @@ public class STLParser {
 				}
 			}
 		}
-		
+
 		System.out.println("Normals:");
 		System.out.println(nMap);
 		System.out.println("Z values");
@@ -306,18 +316,23 @@ public class STLParser {
 					for (int i = 0; i < nvec.length; i++) {
 						nvec[i] = Float.intBitsToFloat(Integer.reverseBytes(in.readInt()));
 					}
-					Vec3d normal = new Vec3d(nvec[0], nvec[1], nvec[2]); // not used (yet)
+					Vec3d normal = new Vec3d(nvec[0], nvec[1], nvec[2]); // not
+																			// used
+																			// (yet)
 					Vec3d[] vertices = new Vec3d[3];
 					for (int v = 0; v < vertices.length; v++) {
 						float[] vals = new float[3];
 						for (int d = 0; d < vals.length; d++) {
 							// http://fightpc.blogspot.com/2014/08/reading-binary-stl-files-in-java.html
-							// (b[3]<<24)&0xff000000 | (b[2]<<16)&0xff0000 | (b[1]<<8)&0xff00 | b[0]&0xff
+							// (b[3]<<24)&0xff000000 | (b[2]<<16)&0xff0000 |
+							// (b[1]<<8)&0xff00 | b[0]&0xff
 							vals[d] = Float.intBitsToFloat(Integer.reverseBytes(in.readInt()));
 						}
 						vertices[v] = new Vec3d(vals[0], vals[1], vals[2]);
 					}
-					short attribute = Short.reverseBytes(in.readShort()); // not used (yet)
+					short attribute = Short.reverseBytes(in.readShort()); // not
+																			// used
+																			// (yet)
 					triangles.add(new Triangle(vertices[0], vertices[1], vertices[2]));
 				}
 			} catch (Exception ex) {

@@ -4,6 +4,9 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Shape;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -20,9 +23,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.swing.AbstractAction;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
+// get stl files from 
+// http://jthatch.com/Terrain2STL/
 public class ContourCreator extends JPanel {
 
 	private List<Shape> contours;
@@ -31,20 +37,27 @@ public class ContourCreator extends JPanel {
 	// private AffineTransform zoom = new AffineTransform();
 	// private AffineTransform drag = new AffineTransform();
 	private AffineTransform at = new AffineTransform();
+	private TopoMap tm;
 
-	Point2D.Double mouseLocation = new Point2D.Double(0, 0);
+	private int index = 0;
+
+	Point2D.Double mouseLocation = new Point2D.Double(0, 0), query = new Point2D.Double(0, 0),
+			closest = new Point2D.Double(0, 0);
 
 	private double lakeWashThresh = 4.06;
 	private double[] seattleMajorVals = { 3, //
 			lakeWashThresh, //
 			4.5395, 4.967, 5.35 }; // 5.01, 5.45
 	private Color[] seattleColors = { Color.BLACK, //
-			Color.BLACK, //
+			// Color.GREEN, //
 			Color.RED, Color.MAGENTA, Color.BLUE };
 
 	public static void main(String[] args) throws IOException {
 
-		ContourCreator cc = new ContourCreator("seattle-good.stl");
+		String file = "SLC.stl";
+		file = "seattle-good.stl";
+
+		ContourCreator cc = new ContourCreator(file);
 
 		JFrame f = new JFrame("Line");
 		f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -58,10 +71,18 @@ public class ContourCreator extends JPanel {
 
 	public ContourCreator(String file) throws IOException {
 
-		TopoMap tm = new TopoMap(file);
+		tm = new TopoMap(file);
 
-		double maxHeight = 6;// 1.5;
-		double stepSize = .1;
+		// 15.7681
+
+		double minHeight = 4;// 14.8;// 4;
+		double maxHeight = 6;// 14.86;// 6;
+		double stepSize = .1;// .005;// .1;
+		// 14.86 for antelope island
+		// 15.7681 (15.769) for utah lake
+		// fuck if I know for the great salt lake
+		double[] majorVals = seattleMajorVals;// {14.8, 14.86,
+												// 15.769};//seattleMajorVals;
 
 		contours = new ArrayList<Shape>();
 		majorContours = new ArrayList<Shape>();
@@ -73,33 +94,39 @@ public class ContourCreator extends JPanel {
 
 		at = new AffineTransform();
 
-		// this mirrors the map so it's right side up, etc
-		at.scale(3, 3);
-		at.translate(0, bounds[1][1]);
-		at.scale(1, -1);
-
-		tm.initialize(seattleMajorVals);
-		List<Path2D.Double> cts = tm.asPaths();
-		for (Path2D.Double ct : cts) {
-			majorContours.add(ct);//at.createTransformedShape(ct));
-		}
-		tm.writePaths("seattle-contours.obj");
-		
-		cts = tm.asSimplePaths(200);
-		for (Path2D.Double ct : cts) {
-			selectionContours.add(ct);//at.createTransformedShape(ct));
-		}
+		// this scales the map so it's bigger from the get go
+		at.scale(2,2);
 
 		// get minor vals
-		tm.initialize(4, maxHeight, stepSize);
-		cts = tm.asPaths();
+		tm.initialize(minHeight, maxHeight, stepSize);
+		List<Path2D.Double> cts = tm.asPaths();
 		for (Path2D.Double ct : cts) {
-			contours.add(ct);//at.createTransformedShape(ct));
+			contours.add(ct);// at.createTransformedShape(ct));
 		}
 
+		tm.initialize(majorVals);
+		tm.writeSVGFile("seattle.svg");
+		cts = tm.asPaths();
+		for (Path2D.Double ct : cts) {
+			majorContours.add(ct);// at.createTransformedShape(ct));
+		}
+		tm.writePaths("seattle-contours2.obj");
+
+		// tm.initialize(new double[] {majorVals[1]});
+		// tm.initialize(majorVals[1],majorVals[1], 1);
+		cts = tm.asSimplePaths(230);
+		for (Path2D.Double ct : cts) {
+			selectionContours.add(ct);// at.createTransformedShape(ct));
+		}
+
+		tm.preComputeSearchMap();
+
+		setFocusable(true);
 		addMouseWheelListener(new ZoomListener());
-		addMouseMotionListener(new DragListener());
-		addMouseListener (new ClickListener());
+		DragListener dl = new DragListener();
+		addMouseMotionListener(dl);
+		addMouseListener(new ClickListener());
+		addKeyListener(new KeysListener());
 	}
 
 	@Override
@@ -116,13 +143,16 @@ public class ContourCreator extends JPanel {
 		}
 		g2.setColor(Color.BLACK);
 		g2.setStroke(new BasicStroke(2));
-		for (int i = 0; i < majorContours.size(); i++) {
-			Shape co = majorContours.get(i);
-			g2.setColor(seattleColors[i]);
+
+		for (index = 0; index < majorContours.size(); index++)//
+		{
+			Shape co = majorContours.get(index);
+			g2.setColor(new Color(co.hashCode() & 0xFFF0));
+			g2.setColor(seattleColors[index]);
 			g2.draw(at.createTransformedShape(co));
 		}
-		
-		int i=0;
+
+		int i = 0;
 		for (Shape co : selectionContours) {
 
 			g2.setColor(Color.RED);
@@ -131,12 +161,17 @@ public class ContourCreator extends JPanel {
 			g2.setColor(Color.BLACK);
 			double[] pts = new double[6];
 			co.getPathIterator(at).currentSegment(pts);
-			g2.drawString(""+co.hashCode(), (float) pts[0], (float) pts[1]);
-			
+			g2.drawString("" + co.hashCode(), (float) pts[0], (float) pts[1]);
+
 			i++;
 		}
 
 		drawWithColor(g2, Color.BLACK, mouseLocation);
+		drawWithColor(g2, Color.RED, (Point2D.Double) at.transform(query, null));
+		drawWithColor(g2, Color.BLACK, (Point2D.Double) at.transform(closest, null));
+
+		g2.setColor(Color.BLACK);
+		g2.drawString("" + index, 10, 10);
 
 		// g2.setTransform(atOrig);
 	}
@@ -198,7 +233,13 @@ public class ContourCreator extends JPanel {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			System.out.println(inv);
+			Point2D.Double closestPt = tm.query(inv);
+			System.out.println("Query: " + inv + "   Closest: " + closestPt);
+			if (inv != null && closestPt != null) {
+				query = inv;
+				closest = closestPt;
+				repaint();
+			}
 		}
 
 		@Override
@@ -210,7 +251,8 @@ public class ContourCreator extends JPanel {
 		@Override
 		public void mouseExited(MouseEvent arg0) {
 			// TODO Auto-generated method stub
-
+			index++;
+			repaint();
 		}
 
 		@Override
@@ -229,28 +271,18 @@ public class ContourCreator extends JPanel {
 
 	private class DragListener implements MouseMotionListener {
 
+		Point2D.Double dragStart, dragEnd;
+
 		@Override
 		public void mouseDragged(MouseEvent arg0) {
-			// drag.translate(arg0.getX() - pt.x, arg0.getY() - pt.y);
-			// drag.setToTranslation
-			at.translate((arg0.getX() - mouseLocation.x) / at.getScaleX(),
-					(arg0.getY() - mouseLocation.y) / at.getScaleY());
-
-			// List<Shape> newShapes = new ArrayList<Shape>();
-			// for (Shape co : contours) {
-			// newShapes.add(drag.createTransformedShape(co));
-			// }
-			// contours = newShapes;
-			// newShapes = new ArrayList<Shape>();
-			// for (Shape co : majorContours) {
-			// newShapes.add(drag.createTransformedShape(co));
-			// }
-			// majorContours = newShapes;
-			//
-			// pt.setLocation(arg0.getX(), arg0.getY());
-
+			// only drag the map if shift isn't being held down
+			if (!isShiftDown) {
+				at.translate((arg0.getX() - mouseLocation.x) / at.getScaleX(),
+						(arg0.getY() - mouseLocation.y) / at.getScaleY());
+			}
 			mouseLocation.setLocation(arg0.getX(), arg0.getY());
 			repaint();
+
 		}
 
 		@Override
@@ -259,7 +291,45 @@ public class ContourCreator extends JPanel {
 			mouseLocation.setLocation(arg0.getX(), arg0.getY());
 			repaint();
 		}
+	}
 
+	private boolean isShiftDown = false;
+
+	private class KeysListener implements KeyListener {
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			// System.out.println("Something happened +" + e.getKeyChar() +
+			// "+"+e.getKeyCode());
+			// if (e.getKeyChar() == 's') {
+			// index++;
+			// repaint();
+			// }
+			if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
+				isShiftDown = true;
+				System.out.println("Shift is down");
+			}
+
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+			if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
+				isShiftDown = false;
+				System.out.println("Shift is up");
+			}
+		}
+
+		@Override
+		public void keyTyped(KeyEvent e) {
+			System.out.println("Something happened +" + e.getKeyChar() + "+");
+			if (e.getKeyChar() == 's') {
+				index++;
+				repaint();
+			}
+		}
 	}
 
 	public void drawWithColor(Graphics2D g, Color color, Point2D.Double pt) {
