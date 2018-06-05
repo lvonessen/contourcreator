@@ -21,6 +21,7 @@ import java.awt.geom.Point2D.Double;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -29,15 +30,18 @@ import javax.swing.JPanel;
 
 // get stl files from 
 // http://jthatch.com/Terrain2STL/
+
+// laser color key: red line cut, blue line etch, black fill etch shape
 public class ContourCreator extends JPanel {
 
-	private List<Shape> contours;
+	private List<Shape> minorContours;
 	private List<Shape> majorContours;
-	private List<Shape> selectionContours;
 	// private AffineTransform zoom = new AffineTransform();
 	// private AffineTransform drag = new AffineTransform();
 	private AffineTransform at = new AffineTransform();
 	private TopoMap tm;
+	
+	private List<Point2D.Double> importantPoints = new ArrayList<Point2D.Double>();
 
 	private int index = 0;
 
@@ -48,8 +52,9 @@ public class ContourCreator extends JPanel {
 	private double[] seattleMajorVals = { 3, //
 			lakeWashThresh, //
 			4.5395, 4.967, 5.35 }; // 5.01, 5.45
-	private Color[] seattleColors = { Color.BLACK, //
-			// Color.GREEN, //
+	private Color[] seattleColors = { //Color.CYAN,//
+			Color.BLACK, //
+			 Color.GREEN, //
 			Color.RED, Color.MAGENTA, Color.BLUE };
 
 	public static void main(String[] args) throws IOException {
@@ -84,9 +89,8 @@ public class ContourCreator extends JPanel {
 		double[] majorVals = seattleMajorVals;// {14.8, 14.86,
 												// 15.769};//seattleMajorVals;
 
-		contours = new ArrayList<Shape>();
+		minorContours = new ArrayList<Shape>();
 		majorContours = new ArrayList<Shape>();
-		selectionContours = new ArrayList<Shape>();
 
 		double[][] bounds = tm.getBounds();
 		System.out.println(Arrays.toString(bounds[0]));
@@ -95,31 +99,40 @@ public class ContourCreator extends JPanel {
 		at = new AffineTransform();
 
 		// this scales the map so it's bigger from the get go
-		at.scale(2,2);
+		at.scale(2, 2);
 
 		// get minor vals
 		tm.initialize(minHeight, maxHeight, stepSize);
-		List<Path2D.Double> cts = tm.asPaths();
-		for (Path2D.Double ct : cts) {
-			contours.add(ct);// at.createTransformedShape(ct));
-		}
+		//tm.initialize("");
+		minorContours.addAll(tm.asPaths());
+		//tm.writeSVGFile("compass-rose2.svg");
+
 
 		tm.initialize(majorVals);
 		tm.writeSVGFile("seattle.svg");
-		cts = tm.asPaths();
-		for (Path2D.Double ct : cts) {
-			majorContours.add(ct);// at.createTransformedShape(ct));
+		majorContours.addAll(tm.asPaths());
+		int i=0;
+		for (Shape s:tm.asSimplePaths(0)){
+			importantPoints.add((Point2D.Double)((Path2D.Double)s).getCurrentPoint());
+			i++;
+			if (i==3){
+				break;
+			}
 		}
+		//Collections.reverse(majorContours);
+		
+		Point2D.Double[] lockPts = { //
+				new Point2D.Double(32.85014858461594, 85.8465006016415),
+				new Point2D.Double(33.63252302035765, 86.0098480645299),
+				new Point2D.Double(33.45732049452805, 89.74933161025403), //
+				new Point2D.Double(33.14531709838673, 89.0) };
+
+		importantPoints.addAll(Arrays.asList(lockPts));
+		
+		tm.preComputeSearchMap();
 		tm.writePaths("seattle-contours2.obj");
 
-		// tm.initialize(new double[] {majorVals[1]});
-		// tm.initialize(majorVals[1],majorVals[1], 1);
-		cts = tm.asSimplePaths(230);
-		for (Path2D.Double ct : cts) {
-			selectionContours.add(ct);// at.createTransformedShape(ct));
-		}
-
-		tm.preComputeSearchMap();
+//		tm.preComputeSearchMap();
 
 		setFocusable(true);
 		addMouseWheelListener(new ZoomListener());
@@ -138,7 +151,7 @@ public class ContourCreator extends JPanel {
 
 		boolean col = true;
 		g2.setColor(Color.LIGHT_GRAY);
-		for (Shape co : contours) {
+		for (Shape co : minorContours) {
 			g2.draw(at.createTransformedShape(co));// zoom.createTransformedShape(drag.createTransformedShape(co)));
 		}
 		g2.setColor(Color.BLACK);
@@ -153,22 +166,28 @@ public class ContourCreator extends JPanel {
 		}
 
 		int i = 0;
-		for (Shape co : selectionContours) {
-
-			g2.setColor(Color.RED);
-			g2.draw(at.createTransformedShape(co));
-
-			g2.setColor(Color.BLACK);
-			double[] pts = new double[6];
-			co.getPathIterator(at).currentSegment(pts);
-			g2.drawString("" + co.hashCode(), (float) pts[0], (float) pts[1]);
-
-			i++;
-		}
+//		// draw off to the right
+//		for (Shape co : selectionContours) {
+//
+//			g2.setColor(Color.RED);
+//			g2.draw(at.createTransformedShape(co));
+//
+//			g2.setColor(Color.BLACK);
+//			double[] pts = new double[6];
+//			co.getPathIterator(at).currentSegment(pts);
+//			g2.drawString("" + co.hashCode(), (float) pts[0], (float) pts[1]);
+//
+//			i++;
+//		}
 
 		drawWithColor(g2, Color.BLACK, mouseLocation);
 		drawWithColor(g2, Color.RED, (Point2D.Double) at.transform(query, null));
 		drawWithColor(g2, Color.BLACK, (Point2D.Double) at.transform(closest, null));
+		
+		for (Point2D.Double pt : importantPoints){
+			drawWithColor(g2, Color.BLUE, (Point2D.Double) at.transform(pt, null));
+			//drawWithColor(g2, Color.BLACK, pt);
+		}
 
 		g2.setColor(Color.BLACK);
 		g2.drawString("" + index, 10, 10);
