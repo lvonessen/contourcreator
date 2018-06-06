@@ -133,6 +133,64 @@ public class Contour implements Serializable {
 		forceCanonical();
 	}
 
+	/**
+	 * 
+	 * @param startPt
+	 * @param toInsert
+	 *            The points to be inserted between startPt and the next
+	 *            clockwise point in this contour
+	 */
+	public void insert(Point2D startPt, List<Point2D> toInsert) {
+		int insertAt = contour.indexOf(startPt);
+		contour.addAll(insertAt, toInsert);
+		forceCanonical();
+	}
+
+	/**
+	 * Deletes the inclusive clockwise range between startPt and endPt
+	 * 
+	 * @requires that both startPt and endPt be part of the contour
+	 * 
+	 * @param startPt
+	 * @param endPt
+	 */
+	public void delete(Point2D startPt, Point2D endPt) {
+		int deleteAt = contour.indexOf(startPt);
+		while (!contour.get(deleteAt).equals(endPt)) {
+			contour.remove(deleteAt);
+			if (deleteAt == contour.size()) {
+				deleteAt = 0;
+			}
+		}
+		contour.remove(deleteAt);
+
+	}
+
+	/**
+	 * Splits this contour into two. Everything (inclusive) between startPt and
+	 * endPt (in clockwise order) will be kept in this contour. Everything
+	 * (inclusive) from endPt to startPt (in clockwise order) will be placed in
+	 * a new contour, which will be returned. After this operation this contour
+	 * will be in canonical form once more.
+	 * 
+	 * @param startPt
+	 * @param endPt
+	 * @return
+	 */
+	public Contour split(Point2D startPt, Point2D endPt) {
+		int thisStartI = contour.indexOf(startPt);
+		int thisEndI = contour.indexOf(endPt);
+
+		// get points
+		List<Point2D> thisList = getSubsequence(thisStartI, thisEndI);
+		List<Point2D> otherList = getSubsequence(thisEndI, thisStartI);
+
+		contour = thisList;
+		forceCanonical();
+
+		return new Contour(otherList);
+	}
+
 	public Path2D asPath(double xOffset) {
 		Path2D path2d = new Path2D.Double();
 		path2d.moveTo(contour.get(0).getX() + xOffset, contour.get(0).getY());
