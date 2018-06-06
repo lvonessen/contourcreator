@@ -4,7 +4,6 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Shape;
-import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -17,14 +16,11 @@ import java.awt.geom.Line2D;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
-import java.awt.geom.Point2D.Double;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import javax.swing.AbstractAction;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -36,25 +32,26 @@ public class ContourCreator extends JPanel {
 
 	private List<Shape> minorContours;
 	private List<Shape> majorContours;
+	private Shape selectedContour;
 	// private AffineTransform zoom = new AffineTransform();
 	// private AffineTransform drag = new AffineTransform();
 	private AffineTransform at = new AffineTransform();
 	private TopoMap tm;
-	
-	private List<Point2D.Double> importantPoints = new ArrayList<Point2D.Double>();
+
+	private List<Point2D> importantPoints = new ArrayList<Point2D>();
 
 	private int index = 0;
 
-	Point2D.Double mouseLocation = new Point2D.Double(0, 0), query = new Point2D.Double(0, 0),
+	Point2D mouseLocation = new Point2D.Double(0, 0), query = new Point2D.Double(0, 0),
 			closest = new Point2D.Double(0, 0);
 
 	private double lakeWashThresh = 4.06;
 	private double[] seattleMajorVals = { 3, //
 			lakeWashThresh, //
 			4.5395, 4.967, 5.35 }; // 5.01, 5.45
-	private Color[] seattleColors = { //Color.CYAN,//
+	private Color[] seattleColors = { // Color.CYAN,//
 			Color.BLACK, //
-			 Color.GREEN, //
+			Color.GREEN, //
 			Color.RED, Color.MAGENTA, Color.BLUE };
 
 	public static void main(String[] args) throws IOException {
@@ -93,8 +90,7 @@ public class ContourCreator extends JPanel {
 		majorContours = new ArrayList<Shape>();
 
 		double[][] bounds = tm.getBounds();
-		System.out.println(Arrays.toString(bounds[0]));
-		System.out.println(Arrays.toString(bounds[1]));
+		System.out.println(Arrays.deepToString(bounds));
 
 		at = new AffineTransform();
 
@@ -102,37 +98,37 @@ public class ContourCreator extends JPanel {
 		at.scale(2, 2);
 
 		// get minor vals
-		tm.initialize(minHeight, maxHeight, stepSize);
-		//tm.initialize("");
+		tm.createContours(minHeight, maxHeight, stepSize);
+		// tm.initialize("");
 		minorContours.addAll(tm.asPaths());
-		//tm.writeSVGFile("compass-rose2.svg");
+		// tm.writeSVGFile("compass-rose2.svg");
 
-
-		tm.initialize(majorVals);
+		tm.createContours(majorVals);
 		tm.writeSVGFile("seattle.svg");
 		majorContours.addAll(tm.asPaths());
-		int i=0;
-		for (Shape s:tm.asSimplePaths(0)){
-			importantPoints.add((Point2D.Double)((Path2D.Double)s).getCurrentPoint());
+		int i = 0;
+		for (Shape s : tm.asSimplePaths(0)) {
+			importantPoints.add((Point2D) ((Path2D) s).getCurrentPoint());
 			i++;
-			if (i==3){
+			if (i == 3) {
 				break;
 			}
 		}
-		//Collections.reverse(majorContours);
-		
-		Point2D.Double[] lockPts = { //
-				new Point2D.Double(32.85014858461594, 85.8465006016415),
-				new Point2D.Double(33.63252302035765, 86.0098480645299),
-				new Point2D.Double(33.45732049452805, 89.74933161025403), //
-				new Point2D.Double(33.14531709838673, 89.0) };
+		// Collections.reverse(majorContours);
 
-		importantPoints.addAll(Arrays.asList(lockPts));
-		
+		Point2D[] pts = { new Point2D.Double(116.19706870342779, 113.22086438152002),
+				new Point2D.Double(117.06282979214781, 113.0),
+				new Point2D.Double(116.16782091503889, 112.56805417367146),
+				new Point2D.Double(116.36186057227516, 112.45529386029666),
+				new Point2D.Double(116.77000276338089, 112.39488527018964),
+				new Point2D.Double(117.0465520656568, 112.48715702477184) };
+
+		importantPoints.addAll(Arrays.asList(pts));
+
 		tm.preComputeSearchMap();
 		tm.writePaths("seattle-contours2.obj");
 
-//		tm.preComputeSearchMap();
+		// tm.preComputeSearchMap();
 
 		setFocusable(true);
 		addMouseWheelListener(new ZoomListener());
@@ -166,27 +162,27 @@ public class ContourCreator extends JPanel {
 		}
 
 		int i = 0;
-//		// draw off to the right
-//		for (Shape co : selectionContours) {
-//
-//			g2.setColor(Color.RED);
-//			g2.draw(at.createTransformedShape(co));
-//
-//			g2.setColor(Color.BLACK);
-//			double[] pts = new double[6];
-//			co.getPathIterator(at).currentSegment(pts);
-//			g2.drawString("" + co.hashCode(), (float) pts[0], (float) pts[1]);
-//
-//			i++;
-//		}
+		// // draw off to the right
+		// for (Shape co : selectionContours) {
+		//
+		// g2.setColor(Color.RED);
+		// g2.draw(at.createTransformedShape(co));
+		//
+		// g2.setColor(Color.BLACK);
+		// double[] pts = new double[6];
+		// co.getPathIterator(at).currentSegment(pts);
+		// g2.drawString("" + co.hashCode(), (float) pts[0], (float) pts[1]);
+		//
+		// i++;
+		// }
 
 		drawWithColor(g2, Color.BLACK, mouseLocation);
-		drawWithColor(g2, Color.RED, (Point2D.Double) at.transform(query, null));
-		drawWithColor(g2, Color.BLACK, (Point2D.Double) at.transform(closest, null));
-		
-		for (Point2D.Double pt : importantPoints){
-			drawWithColor(g2, Color.BLUE, (Point2D.Double) at.transform(pt, null));
-			//drawWithColor(g2, Color.BLACK, pt);
+		drawWithColor(g2, Color.RED, (Point2D) at.transform(query, null));
+		drawWithColor(g2, Color.BLACK, (Point2D) at.transform(closest, null));
+
+		for (Point2D pt : importantPoints) {
+			drawWithColor(g2, Color.BLUE, (Point2D) at.transform(pt, null));
+			// drawWithColor(g2, Color.BLACK, pt);
 		}
 
 		g2.setColor(Color.BLACK);
@@ -216,9 +212,9 @@ public class ContourCreator extends JPanel {
 			// System.out.println(rot + " " + scale);
 
 			// no scaling, no shifting
-			Point2D.Double pt1 = null;
+			Point2D pt1 = null;
 			try {
-				pt1 = (Double) at.inverseTransform(mouseLocation, null);
+				pt1 = at.inverseTransform(mouseLocation, null);
 			} catch (NoninvertibleTransformException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -226,9 +222,10 @@ public class ContourCreator extends JPanel {
 
 			at.scale(scale, scale);
 
-			Point2D.Double pt2 = (Double) at.transform(pt1, null);
+			Point2D pt2 = at.transform(pt1, null);
 
-			at.translate((-pt2.x + mouseLocation.x) / at.getScaleX(), (-pt2.y + mouseLocation.y) / at.getScaleY());
+			at.translate((-pt2.getX() + mouseLocation.getX()) / at.getScaleX(),
+					(-pt2.getY() + mouseLocation.getY()) / at.getScaleY());
 
 			// zoom.setToScale(scale, scale);
 			// zoom.translate(arg0.getX() - scale * arg0.getX(), arg0.getY() -
@@ -245,14 +242,14 @@ public class ContourCreator extends JPanel {
 
 		@Override
 		public void mouseClicked(MouseEvent arg0) {
-			Point2D.Double inv = null;
+			Point2D inv = null;
 			try {
-				inv = (Double) at.inverseTransform(mouseLocation, null);
+				inv = at.inverseTransform(mouseLocation, null);
 			} catch (NoninvertibleTransformException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			Point2D.Double closestPt = tm.query(inv);
+			Point2D closestPt = tm.query(inv);
 			System.out.println("Query: " + inv + "   Closest: " + closestPt);
 			if (inv != null && closestPt != null) {
 				query = inv;
@@ -290,14 +287,14 @@ public class ContourCreator extends JPanel {
 
 	private class DragListener implements MouseMotionListener {
 
-		Point2D.Double dragStart, dragEnd;
+		Point2D dragStart, dragEnd;
 
 		@Override
 		public void mouseDragged(MouseEvent arg0) {
 			// only drag the map if shift isn't being held down
 			if (!isShiftDown) {
-				at.translate((arg0.getX() - mouseLocation.x) / at.getScaleX(),
-						(arg0.getY() - mouseLocation.y) / at.getScaleY());
+				at.translate((arg0.getX() - mouseLocation.getX()) / at.getScaleX(),
+						(arg0.getY() - mouseLocation.getY()) / at.getScaleY());
 			}
 			mouseLocation.setLocation(arg0.getX(), arg0.getY());
 			repaint();
@@ -351,13 +348,13 @@ public class ContourCreator extends JPanel {
 		}
 	}
 
-	public void drawWithColor(Graphics2D g, Color color, Point2D.Double pt) {
+	public void drawWithColor(Graphics2D g, Color color, Point2D pt) {
 		Color c = g.getColor();
 		g.setColor(color);
 		AffineTransform at = g.getTransform();
 
 		// half of final width/height in pixels
-		double crossWidth = 3, x = pt.x, y = pt.y;
+		double crossWidth = 3, x = pt.getX(), y = pt.getY();
 
 		// change so affine transform doesn't ruin
 		double xDiff = crossWidth / at.getScaleX(), yDiff = crossWidth / at.getScaleY();
