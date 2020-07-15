@@ -1,5 +1,7 @@
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -30,6 +32,7 @@ import javax.swing.JPanel;
 // laser color key: red line cut, blue line etch, black fill etch shape
 public class ContourCreator extends JPanel {
 
+	private static final long serialVersionUID = 1L;
 	private List<Shape> minorContours;
 	private List<Shape> majorContours;
 	private Shape selectedContour;
@@ -58,12 +61,15 @@ public class ContourCreator extends JPanel {
 
 		String file = "SLC.stl";
 		file = "seattle-good.stl";
+		file = "/home/laura/workspace/contourcreator/mega-seattle.stl";// "../mega-seattle.stl";
 
 		ContourCreator cc = new ContourCreator(file);
 
 		JFrame f = new JFrame("Line");
 		f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		f.getContentPane().add("Center", cc);
+		Container c = f.getContentPane();
+		c.add(cc, BorderLayout.CENTER);
+		c.add(new MenuPanel(cc.defaultMajorContours()), BorderLayout.EAST);
 
 		f.pack();
 		f.setSize(new Dimension(700, 900));
@@ -86,8 +92,8 @@ public class ContourCreator extends JPanel {
 		double[] majorVals = seattleMajorVals;// {14.8, 14.86,
 												// 15.769};//seattleMajorVals;
 
-		minorContours = new ArrayList<Shape>();
-		majorContours = new ArrayList<Shape>();
+		minorContours = new ArrayList<>();
+		majorContours = new ArrayList<>();
 
 		double[][] bounds = tm.getBounds();
 		System.out.println(Arrays.deepToString(bounds));
@@ -136,6 +142,17 @@ public class ContourCreator extends JPanel {
 		addMouseMotionListener(dl);
 		addMouseListener(new ClickListener());
 		addKeyListener(new KeysListener());
+	}
+
+	private List<Double> defaultMajorContours() {
+		double[][] bounds = tm.getBounds();
+		double minZ = bounds[0][2];
+		double maxZ = bounds[1][2];
+		ArrayList<Double> list = new ArrayList<>();
+		for (int i = 0; i < 7; i++) {
+			list.add(minZ + (maxZ - minZ) / 6.0 * i);
+		}
+		return list;
 	}
 
 	@Override

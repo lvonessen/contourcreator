@@ -82,11 +82,11 @@ public class TopoMap {
 	}
 	
 	private void doSeattleThings(double[] thresholds){
-		contours.get(thresholds[1]).remove(findContour(new Point2D.Double(21.52057, 192.81208763168445), 4.06));
-		contours.get(thresholds[1]).remove(findContour(new Point2D.Double(125.23646370527592, 276.220285021225), 4.06));
-		doBallardLocksDifferentWay();
-		doMontlakeCutThingsViaSplicing(thresholds[1]);
-		doTinyPeninsulaThings(thresholds[1]);
+		// contours.get(thresholds[1]).remove(findContour(new Point2D.Double(21.52057, 192.81208763168445), 4.06));
+		// contours.get(thresholds[1]).remove(findContour(new Point2D.Double(125.23646370527592, 276.220285021225), 4.06));
+		// doBallardLocksDifferentWay();
+		// doMontlakeCutThingsViaSplicing(thresholds[1]);
+		// doTinyPeninsulaThings(thresholds[1]);
 	}
 
 	/**

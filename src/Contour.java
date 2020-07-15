@@ -11,8 +11,8 @@ import java.util.Set;
 /**
  * Canonical form for a contour has points in clockwise order (assuming x
  * increases to the right and y decreases downward) and the first point of the
- * contour is, of the points with minimal y, that with minimal x (
- * "upper left-ish")
+ * contour is, of the points with minimal y, that with minimal x ( "upper
+ * left-ish")
  */
 public class Contour implements Serializable {
 	/**
@@ -90,10 +90,10 @@ public class Contour implements Serializable {
 	/**
 	 * Splices another contour into this one. Everything (inclusive) between
 	 * thisStart and thisEnd (in clockwise order) will be kept. Everything
-	 * (inclusive) from otherStart to otherEnd (in clockwise order) will be
-	 * placed in between, like so: </br>
-	 * thisStart... (this contour)... thisEnd otherStart ...(other contour
-	 * piece)... otherEnd thisStart </br>
+	 * (inclusive) from otherStart to otherEnd (in clockwise order) will be placed
+	 * in between, like so: </br>
+	 * thisStart... (this contour)... thisEnd otherStart ...(other contour piece)...
+	 * otherEnd thisStart </br>
 	 * to flip the join order, so that the segment of the other contour is in
 	 * reversed order, pass in reverse == true</br>
 	 * The other contour will remain unchanged, and after this operation this
@@ -136,9 +136,8 @@ public class Contour implements Serializable {
 	/**
 	 * 
 	 * @param startPt
-	 * @param toInsert
-	 *            The points to be inserted between startPt and the next
-	 *            clockwise point in this contour
+	 * @param toInsert The points to be inserted between startPt and the next
+	 *                 clockwise point in this contour
 	 */
 	public void insert(Point2D startPt, List<Point2D> toInsert) {
 		int insertAt = contour.indexOf(startPt);
@@ -169,9 +168,9 @@ public class Contour implements Serializable {
 	/**
 	 * Splits this contour into two. Everything (inclusive) between startPt and
 	 * endPt (in clockwise order) will be kept in this contour. Everything
-	 * (inclusive) from endPt to startPt (in clockwise order) will be placed in
-	 * a new contour, which will be returned. After this operation this contour
-	 * will be in canonical form once more.
+	 * (inclusive) from endPt to startPt (in clockwise order) will be placed in a
+	 * new contour, which will be returned. After this operation this contour will
+	 * be in canonical form once more.
 	 * 
 	 * @param startPt
 	 * @param endPt
@@ -210,7 +209,7 @@ public class Contour implements Serializable {
 
 	public void reIndex(int inflectionIndex) {
 
-		if (inflectionIndex == 0) {
+		if (inflectionIndex == 0 || inflectionIndex == contour.size() - 1) {
 			return;
 		}
 
@@ -294,14 +293,11 @@ public class Contour implements Serializable {
 
 	/**
 	 * 
-	 * @param p
-	 *            one endpoint
-	 * @param q
-	 *            middle point
-	 * @param r
-	 *            other endpoint
-	 * @return 0 if the points are colinear with q in the middle, up to Math.PI
-	 *         if they're colinear but q isn't in the middle.
+	 * @param p one endpoint
+	 * @param q middle point
+	 * @param r other endpoint
+	 * @return 0 if the points are colinear with q in the middle, up to Math.PI if
+	 *         they're colinear but q isn't in the middle.
 	 */
 	private double getTheta(Point2D p, Point2D q, Point2D r) {
 		return Math.acos(//
