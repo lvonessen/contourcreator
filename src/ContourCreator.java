@@ -16,12 +16,12 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.NoninvertibleTransformException;
-import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -35,9 +35,7 @@ public class ContourCreator extends JPanel {
 	private static final long serialVersionUID = 1L;
 	private List<Shape> minorContours;
 	private List<Shape> majorContours;
-	private Shape selectedContour;
-	// private AffineTransform zoom = new AffineTransform();
-	// private AffineTransform drag = new AffineTransform();
+	private List<Shape> transformedMajorContours;
 	private AffineTransform at = new AffineTransform();
 	private TopoMap tm;
 
@@ -56,6 +54,9 @@ public class ContourCreator extends JPanel {
 			Color.BLACK, //
 			Color.GREEN, //
 			Color.RED, Color.MAGENTA, Color.BLUE };
+
+	private final String[] greenToRedHex = { "#00876c", "#379469", "#58a066", "#78ab63", "#98b561", "#b8bf62",
+			"#dac767", "#deb256", "#e09d4b", "#e18745", "#e06f45", "#dc574a", "#d43d51" };
 
 	public static void main(String[] args) throws IOException {
 
@@ -79,6 +80,12 @@ public class ContourCreator extends JPanel {
 
 	public ContourCreator(String file) throws IOException {
 
+		System.out.println("Print colors");
+		for (String color : greenToRedHex) {
+			System.out.println("Color: " + Color.decode(color));
+		}
+		System.out.println("Done printing colors");
+
 		tm = new TopoMap(file);
 
 		// 15.7681
@@ -97,29 +104,38 @@ public class ContourCreator extends JPanel {
 
 		double[][] bounds = tm.getBounds();
 		System.out.println(Arrays.deepToString(bounds));
+		minHeight = bounds[0][2];
+		maxHeight = bounds[1][2];
+		stepSize = 1.5;
 
 		at = new AffineTransform();
+		at.translate(-bounds[0][0], -bounds[0][1]);
 
 		// this scales the map so it's bigger from the get go
 		at.scale(2, 2);
 
-		// get minor vals
-		tm.createContours(minHeight, maxHeight, stepSize);
+		// // get minor vals
+		// tm.createContours(minHeight, maxHeight, stepSize);
 		// tm.initialize("");
-		minorContours.addAll(tm.asPaths());
+		// minorContours.addAll(tm.asPaths());
 		// tm.writeSVGFile("compass-rose2.svg");
 
-		tm.createContours(majorVals);
-		tm.writeSVGFile("seattle.svg");
+		// tm.createContours(majorVals);
+		// tm.writeSVGFile("seattle.svg");
+		tm.createContours(minHeight, maxHeight, stepSize);
 		majorContours.addAll(tm.asPaths());
-		int i = 0;
-		for (Shape s : tm.asSimplePaths(0)) {
-			importantPoints.add((Point2D) ((Path2D) s).getCurrentPoint());
-			i++;
-			if (i == 3) {
-				break;
-			}
-		}
+		transformedMajorContours = majorContours.stream().map((el) -> {
+			return at.createTransformedShape(el);
+		}).collect(Collectors.toList());
+
+		// int i = 0;
+		// for (Shape s : tm.asSimplePaths(0)) {
+		// importantPoints.add((Point2D) ((Path2D) s).getCurrentPoint());
+		// i++;
+		// if (i == 3) {
+		// break;
+		// }
+		// }
 		// Collections.reverse(majorContours);
 
 		Point2D[] pts = { new Point2D.Double(116.19706870342779, 113.22086438152002),
@@ -132,14 +148,13 @@ public class ContourCreator extends JPanel {
 		importantPoints.addAll(Arrays.asList(pts));
 
 		tm.preComputeSearchMap();
-		tm.writePaths("seattle-contours2.obj");
+		// tm.writePaths("seattle-contours2.obj");
 
 		// tm.preComputeSearchMap();
 
 		setFocusable(true);
 		addMouseWheelListener(new ZoomListener());
-		DragListener dl = new DragListener();
-		addMouseMotionListener(dl);
+		addMouseMotionListener(new DragListener());
 		addMouseListener(new ClickListener());
 		addKeyListener(new KeysListener());
 	}
@@ -159,23 +174,21 @@ public class ContourCreator extends JPanel {
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		Graphics2D g2 = (Graphics2D) g;
-		// AffineTransform atOrig = g2.getTransform();
-		// g2.transform(at);
 
-		boolean col = true;
-		g2.setColor(Color.LIGHT_GRAY);
-		for (Shape co : minorContours) {
-			g2.draw(at.createTransformedShape(co));// zoom.createTransformedShape(drag.createTransformedShape(co)));
-		}
+		// g2.setColor(Color.LIGHT_GRAY);
+		// for (Shape co : minorContours) {
+		// g2.draw(at.createTransformedShape(co));
+		// }
 		g2.setColor(Color.BLACK);
 		g2.setStroke(new BasicStroke(2));
 
 		for (index = 0; index < majorContours.size(); index++)//
 		{
-			Shape co = majorContours.get(index);
-			g2.setColor(new Color(co.hashCode() & 0xFFF0));
-			g2.setColor(seattleColors[index]);
-			g2.draw(at.createTransformedShape(co));
+			Shape co = transformedMajorContours.get(index);
+			// g2.setColor(new Color(co.hashCode() & 0xFFF0));
+			g2.setColor(Color.decode(
+					greenToRedHex[(int) (index * (greenToRedHex.length - 1.0) / (majorContours.size() - 1.0))]));// seattleColors[index]);
+			g2.draw(co);
 		}
 
 		int i = 0;
@@ -243,6 +256,10 @@ public class ContourCreator extends JPanel {
 
 			at.translate((-pt2.getX() + mouseLocation.getX()) / at.getScaleX(),
 					(-pt2.getY() + mouseLocation.getY()) / at.getScaleY());
+
+			transformedMajorContours = majorContours.stream().map((el) -> {
+				return at.createTransformedShape(el);
+			}).collect(Collectors.toList());
 
 			// zoom.setToScale(scale, scale);
 			// zoom.translate(arg0.getX() - scale * arg0.getX(), arg0.getY() -
@@ -312,6 +329,9 @@ public class ContourCreator extends JPanel {
 			if (!isShiftDown) {
 				at.translate((arg0.getX() - mouseLocation.getX()) / at.getScaleX(),
 						(arg0.getY() - mouseLocation.getY()) / at.getScaleY());
+				transformedMajorContours = majorContours.stream().map((el) -> {
+					return at.createTransformedShape(el);
+				}).collect(Collectors.toList());
 			}
 			mouseLocation.setLocation(arg0.getX(), arg0.getY());
 			repaint();

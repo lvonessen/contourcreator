@@ -193,9 +193,14 @@ public class Contour implements Serializable {
 	public Path2D asPath(double xOffset) {
 		Path2D path2d = new Path2D.Double();
 		path2d.moveTo(contour.get(0).getX() + xOffset, contour.get(0).getY());
+		int i = 0;
 		for (Point2D pt : contour) {
-			path2d.lineTo(pt.getX() + xOffset, pt.getY());
+			if (i % 5 == 0) {
+				path2d.lineTo(pt.getX() + xOffset, pt.getY());
+			}
+			i++;
 		}
+		path2d.lineTo(contour.get(0).getX() + xOffset, contour.get(0).getY());
 		return path2d;
 	}
 
@@ -207,7 +212,7 @@ public class Contour implements Serializable {
 		return contour.indexOf(pt);
 	}
 
-	public void reIndex(int inflectionIndex) {
+	private void reIndex(int inflectionIndex) {
 
 		if (inflectionIndex == 0 || inflectionIndex == contour.size() - 1) {
 			return;
@@ -230,7 +235,7 @@ public class Contour implements Serializable {
 
 	/**
 	 * 
-	 * @return The first point to satisfy upper-left criteria
+	 * @return The index of the first point to satisfy upper-left criteria
 	 */
 	private int findUpperLeft() {
 		upperLeft = new Point2D.Double(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -305,6 +310,10 @@ public class Contour implements Serializable {
 						/ (p.distance(q) * q.distance(r)));
 	}
 
+	/**
+	 * 
+	 * @return The area of the tight bounding box containing this contour.
+	 */
 	public double getAreaEstimate() {
 		double[] minXY = { Double.MAX_VALUE, Double.MAX_VALUE };
 		double[] maxXY = { Double.MIN_VALUE, Double.MIN_VALUE };

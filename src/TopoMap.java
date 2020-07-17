@@ -5,7 +5,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
-import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -80,10 +79,12 @@ public class TopoMap {
 		doSeattleThings(thresholds);
 		removeTinys(15);
 	}
-	
-	private void doSeattleThings(double[] thresholds){
-		// contours.get(thresholds[1]).remove(findContour(new Point2D.Double(21.52057, 192.81208763168445), 4.06));
-		// contours.get(thresholds[1]).remove(findContour(new Point2D.Double(125.23646370527592, 276.220285021225), 4.06));
+
+	private void doSeattleThings(double[] thresholds) {
+		// contours.get(thresholds[1]).remove(findContour(new Point2D.Double(21.52057,
+		// 192.81208763168445), 4.06));
+		// contours.get(thresholds[1]).remove(findContour(new
+		// Point2D.Double(125.23646370527592, 276.220285021225), 4.06));
 		// doBallardLocksDifferentWay();
 		// doMontlakeCutThingsViaSplicing(thresholds[1]);
 		// doTinyPeninsulaThings(thresholds[1]);
@@ -91,10 +92,8 @@ public class TopoMap {
 
 	/**
 	 * 
-	 * @param min
-	 *            inclusive
-	 * @param max
-	 *            inclusive
+	 * @param min  inclusive
+	 * @param max  inclusive
 	 * @param step
 	 */
 	public void createContours(double min, double max, double step) {
@@ -109,19 +108,19 @@ public class TopoMap {
 		Set<Contour> contour = new HashSet<Contour>();
 		// in case you need to change double equality
 		double almostZero = 0.0000;
-	
+
 		IntervalTree.IntervalData<Triangle> interval = mesh.query(zThresh);
-	
+
 		if (interval == null) {
 			return contour;
 		}
-	
+
 		Collection<Triangle> intersectingTriangles = mesh.query(zThresh).getData();
-	
+
 		for (Triangle t : intersectingTriangles) {
 			int countBelow = 0, countAbove = 0;
 			Vec3d prev = null;
-	
+
 			// figure out whether this triangle intersects the z = zThresh plane
 			for (Vec3d vertex : t.getVertices()) {
 				// if not zero
@@ -136,7 +135,7 @@ public class TopoMap {
 				}
 				prev = vertex;
 			}
-	
+
 			List<Point2D> list = new ArrayList<Point2D>();
 			// if the triangle intersects the plane...
 			if (countBelow != 3 && countAbove != 3) {
@@ -159,7 +158,7 @@ public class TopoMap {
 		for (List<Point2D> list : consolidator.values()) {
 			contour.add(new Contour(list));
 		}
-	
+
 		return contour;
 	}
 
@@ -169,15 +168,15 @@ public class TopoMap {
 				+ "1506.5,-3365.4 4980.6,129.5 " + "4150.4,-1873.4 4980.6,-4787.2 4980.6,-1397.53512476 "
 				+ "8452.2,-3365.3 4980.6,129.5 " + "6970.7,-729.2 9900,106.1 6507.63512476,129.5 "
 				+ "8470.4,3601 4980.6,129.5 " + "5831.6,2093.5 4983.2,5007.2 Z M";
-	
+
 		// center: 4980.6,129.5
 		// left: 3453.56487524
-	
+
 		// radius: 1527.03512476,129.5
 		// right: 6507.63512476,129.5
 		// down: 4980.6,1656.53512476
 		// up: 4980.6,-1397.53512476
-	
+
 		String[] split = svgPath.split(" ");
 		List<Point2D> list = new ArrayList<Point2D>();
 		Set<Contour> set = new HashSet<Contour>();
@@ -194,7 +193,7 @@ public class TopoMap {
 				list.add(new Point2D.Double(25 - Double.parseDouble(coords[0]) / 300, //
 						25 + Double.parseDouble(coords[1]) / 300));
 			}
-	
+
 		}
 		contours.clear();
 		contours.put(0.0, set);
@@ -217,7 +216,7 @@ public class TopoMap {
 		otherEnd = new Point2D.Double(33.14531709838673, 89.0);
 
 		lake.splice(ocean, thisStart, thisEnd, otherStart, otherEnd, false);
-		
+
 		// finalize
 		contours.remove(3.0);
 	}
@@ -256,8 +255,8 @@ public class TopoMap {
 				{ new Point2D.Double(113.12315993744676, 110.0),
 						new Point2D.Double(106.8694314557018, 110.01196272547914),
 						new Point2D.Double(106.25185611892023, 110.59032692976665),
-						new Point2D.Double(106.2578, 111.32093087685276) } }; 
-		
+						new Point2D.Double(106.2578, 111.32093087685276) } };
+
 		List<Point2D> l = Arrays.asList(pts[0]);
 		l = new ArrayList<Point2D>(l);
 		l.add(l.get(0));
@@ -335,37 +334,37 @@ public class TopoMap {
 	 * @return
 	 */
 	public Point2D query(Point2D searchPt) {
-	
+
 		if (searchPt == null) {
 			return null;
 		}
-	
+
+		// Compute the four points with integer x/y values closest to the searchPt.
 		int truncX = (int) searchPt.getX();
 		int truncY = (int) searchPt.getY();
 		int otherX = truncX, otherY = truncY;
-	
 		if (searchPt.getX() - .5 < truncX) {
 			otherX--;
 		} else {
 			otherX++;
 		}
-	
 		if (searchPt.getY() - .5 < truncY) {
 			otherY--;
 		} else {
 			otherY++;
 		}
-	
 		Point2D[] pts = { new Point2D.Double(truncX, truncY), new Point2D.Double(truncX, otherY),
 				new Point2D.Double(otherX, truncY), new Point2D.Double(otherX, otherY) };
-	
+
+		// Index into the search map with these integer-valued points.
 		Set<Point2D> closePts = new HashSet<Point2D>();
 		for (Point2D pt : pts) {
 			if (searchMap.containsKey(pt)) {
 				closePts.addAll(searchMap.get(pt));
 			}
 		}
-	
+
+		// Of the points discovered in the search map, return the closest one.
 		Point2D closestPt = null;
 		double minDist = Double.MAX_VALUE;
 		for (Point2D pt : closePts) {
@@ -375,12 +374,12 @@ public class TopoMap {
 				closestPt = pt;
 			}
 		}
-	
+
 		return closestPt;
 	}
 
 	/**
-	 * List of paths corresponding to threshold values
+	 * List of paths corresponding to threshold values, one path per threshold value
 	 * 
 	 * @return
 	 */
@@ -398,12 +397,12 @@ public class TopoMap {
 	}
 
 	/**
-	 * List of paths corresponding to threshold values
+	 * List of paths corresponding to underlying contours values
 	 * 
 	 * @return
 	 */
 	public List<Path2D> asSimplePaths(int xOffset) {
-	
+
 		List<Path2D> paths = new ArrayList<Path2D>();
 		for (double thresh : contours.keySet()) {
 			Set<Contour> curContours = contours.get(thresh);
@@ -515,7 +514,7 @@ public class TopoMap {
 
 		return new Point2D.Double(newX, newY);
 	}
-	
+
 	private Point2D rounded(Point2D pt) {
 		return new Point2D.Double(round(pt.getX()), round(pt.getY()));
 	}
